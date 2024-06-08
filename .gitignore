@@ -1,6 +1,6 @@
 # Pycharm
 /.idea/.gitignore
-/.idea/BiFormer-Cifa100.iml
+/.idea/BiFormer-Cifar100.iml
 /.idea/misc.xml
 /.idea/modules.xml
 /.idea/inspectionProfiles/profiles_settings.xml
