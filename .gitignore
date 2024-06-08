@@ -1,5 +1,8 @@
-data
-local*
-outputs*
-__pycache__
-.pyc
+# Pycharm
+/.idea/.gitignore
+/.idea/BiFormer-Cifa100.iml
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/inspectionProfiles/profiles_settings.xml
+/.idea/inspectionProfiles/Project_Default.xml
+/.idea/vcs.xml
