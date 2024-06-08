@@ -23,7 +23,7 @@ If you want to manually config the environment, you can use the following comman
 
 ```bash
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-pip3 install fvcore timm einops fairscale
+pip3 install fvcore timm einops fairscale omegaconf
 ````
 
 ## Dataset Preparation
