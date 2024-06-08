@@ -19,6 +19,13 @@ cp configs/slurm/sz10.yaml configs/slurm/${CLUSTER_ID}.yaml && vim configs/slurm
 ```
 hence you can launch experiments in any available cluster consistently with `+slurm=${CLUSTER_ID}`.
 
+If you want to manually config the environment, you can use the following commands:
+
+```bash
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+pip3 install fvcore timm einops fairscale
+````
+
 ## Dataset Preparation
 
 1. Download the [ImageNet-1K](http://image-net.org/) classification dataset and structure the data as follows:
