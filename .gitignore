@@ -8,7 +8,17 @@
 /.idea/vcs.xml
 
 # Checkpoints
+/checkpoints
 /checkpoints/*
+
+# Data
+/data
 /data/*
+
+# Logs
+/logs
 /logs/*
+
+# Output
+/out
 /out/*
