@@ -16,7 +16,7 @@ class="center">
 
 ## News
 
-* 2023-04-11: [object detection code](./object_detection/) is released. It achives significantly better results than the paper reported due to a bug fix.
+* 2023-04-11: [object detection code](./object_detection/) is released. It archives significantly better results than the paper reported due to a bug fix.
 
 * 2023-03-24: For better memory and computation efficieny, we are diving into the optimization of BRA with CUDA. Please stay tuned.
   - Collaborations and contributions are welcome, especially if you are an expert in CUDA/[cutlass](https://github.com/NVIDIA/cutlass). There is a chance to co-author a paper.
