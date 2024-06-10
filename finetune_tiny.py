@@ -56,7 +56,7 @@ def get_args_parser():
     # Basic parameters
     parser.add_argument('--log-dir', default='./logs/', type=str)
     parser.add_argument('--batch-size', default=128, type=int)
-    parser.add_argument('--epochs', default=300, type=int)
+    parser.add_argument('--epochs', default=30, type=int)
 
     # Model parameters
     parser.add_argument('--model', default='biformer_tiny', type=str, metavar='MODEL',
@@ -172,7 +172,7 @@ def get_args_parser():
                         choices=['kingdom', 'phylum', 'class', 'order', 'supercategory', 'family', 'genus', 'name'],
                         type=str, help='semantic granularity')
 
-    parser.add_argument('--output_dir', default='./out/', type=str,
+    parser.add_argument('--output_dir', default='./out/tiny_cifar/', type=str,
                         help='path where to save, empty for no saving')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')

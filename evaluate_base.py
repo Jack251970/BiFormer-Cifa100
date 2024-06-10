@@ -161,7 +161,7 @@ def get_args_parser():
     parser.add_argument('--distillation-tau', default=1.0, type=float, help="")
 
     # * Finetuning params
-    parser.add_argument('--finetune', default='./checkpoints/pre/biformer_base_in1k.pth', help='finetune from checkpoint')
+    parser.add_argument('--finetune', default='', help='finetune from checkpoint')
 
     # Dataset parameters
     parser.add_argument('--data-path', default='./data/cifar-100/', type=str,
@@ -180,7 +180,7 @@ def get_args_parser():
     parser.add_argument('--resume', default='', help='resume from checkpoint')
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
-    parser.add_argument('--eval', action='store_true', default=False, help='Perform evaluation only')
+    parser.add_argument('--eval', action='store_true', default=True, help='Perform evaluation only')
     parser.add_argument('--dist-eval', action='store_true', default=True, help='Enabling distributed evaluation')
     parser.add_argument('--load-release', action='store_true', default=False, help='load released checkpoints')
     parser.add_argument('--num_workers', default=10, type=int)
