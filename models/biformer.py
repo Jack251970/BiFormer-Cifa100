@@ -29,6 +29,7 @@ from ._common import Attention, AttentionLePE, DWConv
 
 # from positional_encodings import PositionalEncodingPermute2D, Summer
 # from siren_pytorch import SirenNet
+from Visualizer.visualizer import get_local
 
 
 
@@ -53,43 +54,43 @@ def get_pe_layer(emb_dim, pe_dim=None, name='none'):
 
 class Block(nn.Module):
     def __init__(self, dim, drop_path=0., layer_scale_init_value=-1,
-                       num_heads=8, n_win=7, qk_dim=None, qk_scale=None,
-                       kv_per_win=4, kv_downsample_ratio=4, kv_downsample_kernel=None, kv_downsample_mode='ada_avgpool',
-                       topk=4, param_attention="qkvo", param_routing=False, diff_routing=False, soft_routing=False, mlp_ratio=4, mlp_dwconv=False,
-                       side_dwconv=5, before_attn_dwconv=3, pre_norm=True, auto_pad=False):
+                 num_heads=8, n_win=7, qk_dim=None, qk_scale=None,
+                 kv_per_win=4, kv_downsample_ratio=4, kv_downsample_kernel=None, kv_downsample_mode='ada_avgpool',
+                 topk=4, param_attention="qkvo", param_routing=False, diff_routing=False, soft_routing=False, mlp_ratio=4, mlp_dwconv=False,
+                 side_dwconv=5, before_attn_dwconv=3, pre_norm=True, auto_pad=False, out_attn=False):
         super().__init__()
         qk_dim = qk_dim or dim
 
         # modules
         if before_attn_dwconv > 0:
-            self.pos_embed = nn.Conv2d(dim, dim,  kernel_size=before_attn_dwconv, padding=1, groups=dim)
+            self.pos_embed = nn.Conv2d(dim, dim, kernel_size=before_attn_dwconv, padding=1, groups=dim)
         else:
             self.pos_embed = lambda x: 0
-        self.norm1 = nn.LayerNorm(dim, eps=1e-6) # important to avoid attention collapsing
+        self.norm1 = nn.LayerNorm(dim, eps=1e-6)  # important to avoid attention collapsing
         if topk > 0:
             self.attn = BiLevelRoutingAttention(dim=dim, num_heads=num_heads, n_win=n_win, qk_dim=qk_dim,
                                         qk_scale=qk_scale, kv_per_win=kv_per_win, kv_downsample_ratio=kv_downsample_ratio,
                                         kv_downsample_kernel=kv_downsample_kernel, kv_downsample_mode=kv_downsample_mode,
                                         topk=topk, param_attention=param_attention, param_routing=param_routing,
                                         diff_routing=diff_routing, soft_routing=soft_routing, side_dwconv=side_dwconv,
-                                        auto_pad=auto_pad)
+                                        auto_pad=auto_pad, out_attn=out_attn)
         elif topk == -1:
             self.attn = Attention(dim=dim)
         elif topk == -2:
             self.attn = AttentionLePE(dim=dim, side_dwconv=side_dwconv)
         elif topk == 0:
-            self.attn = nn.Sequential(Rearrange('n h w c -> n c h w'), # compatiability
-                                      nn.Conv2d(dim, dim, 1), # pseudo qkv linear
-                                      nn.Conv2d(dim, dim, 5, padding=2, groups=dim), # pseudo attention
-                                      nn.Conv2d(dim, dim, 1), # pseudo out linear
+            self.attn = nn.Sequential(Rearrange('n h w c -> n c h w'),  # compatiability
+                                      nn.Conv2d(dim, dim, 1),  # pseudo qkv linear
+                                      nn.Conv2d(dim, dim, 5, padding=2, groups=dim),  # pseudo attention
+                                      nn.Conv2d(dim, dim, 1),  # pseudo out linear
                                       Rearrange('n c h w -> n h w c')
-                                     )
+                                      )
         self.norm2 = nn.LayerNorm(dim, eps=1e-6)
-        self.mlp = nn.Sequential(nn.Linear(dim, int(mlp_ratio*dim)),
-                                 DWConv(int(mlp_ratio*dim)) if mlp_dwconv else nn.Identity(),
+        self.mlp = nn.Sequential(nn.Linear(dim, int(mlp_ratio * dim)),
+                                 DWConv(int(mlp_ratio * dim)) if mlp_dwconv else nn.Identity(),
                                  nn.GELU(),
-                                 nn.Linear(int(mlp_ratio*dim), dim)
-                                )
+                                 nn.Linear(int(mlp_ratio * dim), dim)
+                                 )
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
 
         # tricks: layer scale & pre_norm/post_norm
@@ -100,7 +101,7 @@ class Block(nn.Module):
         else:
             self.use_layer_scale = False
         self.pre_norm = pre_norm
-            
+        self.out_attn = out_attn
 
     def forward(self, x):
         """
@@ -112,25 +113,66 @@ class Block(nn.Module):
         x = x.permute(0, 2, 3, 1) # (N, C, H, W) -> (N, H, W, C)
 
         # attention & mlp
-        if self.pre_norm:
-            if self.use_layer_scale:
-                x = x + self.drop_path(self.gamma1 * self.attn(self.norm1(x))) # (N, H, W, C)
-                x = x + self.drop_path(self.gamma2 * self.mlp(self.norm2(x))) # (N, H, W, C)
-            else:
-                x = x + self.drop_path(self.attn(self.norm1(x))) # (N, H, W, C)
-                x = x + self.drop_path(self.mlp(self.norm2(x))) # (N, H, W, C)
-        else: # https://kexue.fm/archives/9009
-            if self.use_layer_scale:
-                x = self.norm1(x + self.drop_path(self.gamma1 * self.attn(x))) # (N, H, W, C)
-                x = self.norm2(x + self.drop_path(self.gamma2 * self.mlp(x))) # (N, H, W, C)
-            else:
-                x = self.norm1(x + self.drop_path(self.attn(x))) # (N, H, W, C)
-                x = self.norm2(x + self.drop_path(self.mlp(x))) # (N, H, W, C)
+        r_weight, r_idx, attn_weight = None, None, None
+        if self.out_attn:
+            if self.pre_norm:
+                if self.use_layer_scale:
+                    out, r_weight, r_idx, attn_weight = self.attn(self.norm1(x))
+                    x = x + self.drop_path(self.gamma1 * out)  # (N, H, W, C)
+                    x = x + self.drop_path(self.gamma2 * self.mlp(self.norm2(x)))  # (N, H, W, C)
+                else:
+                    out, r_weight, r_idx, attn_weight = self.attn(self.norm1(x))
+                    x = x + self.drop_path(out)  # (N, H, W, C)
+                    x = x + self.drop_path(self.mlp(self.norm2(x)))  # (N, H, W, C)
+            else:  # https://kexue.fm/archives/9009
+                if self.use_layer_scale:
+                    out, r_weight, r_idx, attn_weight = self.attn(x)
+                    x = self.norm1(x + self.drop_path(self.gamma1 * out))  # (N, H, W, C)
+                    x = self.norm2(x + self.drop_path(self.gamma2 * self.mlp(x)))  # (N, H, W, C)
+                else:
+                    out, r_weight, r_idx, attn_weight = self.attn(x)
+                    x = self.norm1(x + self.drop_path(out))  # (N, H, W, C)
+                    x = self.norm2(x + self.drop_path(self.mlp(x)))  # (N, H, W, C)
+        else:
+            if self.pre_norm:
+                if self.use_layer_scale:
+                    x = x + self.drop_path(self.gamma1 * self.attn(self.norm1(x))) # (N, H, W, C)
+                    x = x + self.drop_path(self.gamma2 * self.mlp(self.norm2(x))) # (N, H, W, C)
+                else:
+                    x = x + self.drop_path(self.attn(self.norm1(x))) # (N, H, W, C)
+                    x = x + self.drop_path(self.mlp(self.norm2(x))) # (N, H, W, C)
+            else:  # https://kexue.fm/archives/9009
+                if self.use_layer_scale:
+                    x = self.norm1(x + self.drop_path(self.gamma1 * self.attn(x))) # (N, H, W, C)
+                    x = self.norm2(x + self.drop_path(self.gamma2 * self.mlp(x))) # (N, H, W, C)
+                else:
+                    x = self.norm1(x + self.drop_path(self.attn(x))) # (N, H, W, C)
+                    x = self.norm2(x + self.drop_path(self.mlp(x))) # (N, H, W, C)
 
         # permute back
-        x = x.permute(0, 3, 1, 2) # (N, H, W, C) -> (N, C, H, W)
-        return x
+        x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
+        if self.out_attn:  # [192, 384, 14, 14], [192, 49, 16], [192, 49, 16], [9408, 12, 4, 64]
+            self.local_r_weight(r_weight)
+            self.local_r_idx(r_idx)
+            self.local_attn_weight(attn_weight)
+            return x
+        else:
+            return x
 
+    @get_local('r_weight')
+    def local_r_weight(self, _r_weight):
+        r_weight = _r_weight
+        return r_weight
+
+    @get_local('r_idx')
+    def local_r_idx(self, _r_idx):
+        r_idx = _r_idx
+        return r_idx
+
+    @get_local('attn_weight')
+    def local_attn_weight(self, _attn_weight):
+        attn_weight = _attn_weight
+        return attn_weight
 
 
 class BiFormer(nn.Module):
@@ -210,7 +252,7 @@ class BiFormer(nn.Module):
 
         self.stages = nn.ModuleList() # 4 feature resolution stages, each consisting of multiple residual blocks
         nheads= [dim // head_dim for dim in qk_dims]
-        dp_rates=[x.item() for x in torch.linspace(0, drop_path_rate, sum(depth))] 
+        dp_rates=[x.item() for x in torch.linspace(0, drop_path_rate, sum(depth))]
         cur = 0
         for i in range(4):
             stage = nn.Sequential(
@@ -234,7 +276,8 @@ class BiFormer(nn.Module):
                         side_dwconv=side_dwconv,
                         before_attn_dwconv=before_attn_dwconv,
                         pre_norm=pre_norm,
-                        auto_pad=auto_pad) for j in range(depth[i])],
+                        auto_pad=auto_pad,
+                        out_attn=(i==2and j==depth[i]-1and topks[i]>0)) for j in range(depth[i])],
             )
             if i in use_checkpoint_stages:
                 stage = checkpoint_wrapper(stage)
@@ -277,7 +320,7 @@ class BiFormer(nn.Module):
         self.num_classes = num_classes
         self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
-    def forward_features(self, x):
+    def forward_features(self, x):  # [192, 3, 224, 224]
         for i in range(4):
             x = self.downsample_layers[i](x) # res = (56, 28, 14, 7), wins = (64, 16, 4, 1)
             x = self.stages[i](x)
@@ -285,7 +328,7 @@ class BiFormer(nn.Module):
         x = self.pre_logits(x)
         return x
 
-    def forward(self, x):
+    def forward(self, x):  # [192, 3, 224, 224]
         x = self.forward_features(x)
         x = x.flatten(2).mean(-1)
         x = self.head(x)

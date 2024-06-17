@@ -16,6 +16,8 @@ from losses import DistillationLoss
 import utils
 from torch.utils.tensorboard import SummaryWriter
 
+from Visualizer.visualizer import get_local
+
 
 def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
@@ -80,7 +82,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
 
 
 @torch.no_grad()
-def evaluate(data_loader, model, device):
+def evaluate(data_loader, model, device, output_images=False):
     criterion = torch.nn.CrossEntropyLoss()
 
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -89,13 +91,19 @@ def evaluate(data_loader, model, device):
     # switch to evaluation mode
     model.eval()
 
-    for images, target in metric_logger.log_every(data_loader, 10, header):
+    for images, target in metric_logger.log_every(data_loader, 10, header):  # [192, 3, 224, 224], [192]
         images = images.to(device, non_blocking=True)
         target = target.to(device, non_blocking=True)
 
         # compute output
+        get_local.clear()
         with torch.cuda.amp.autocast():
             output = model(images)
+            if output_images:
+                cache = get_local.cache
+                r_weight = cache['Block.local_r_weight'][0]  # [192, 49, 16],
+                r_idx = cache['Block.local_r_idx'][0]  # [192, 49, 16]
+                attn_weight = cache['Block.local_attn_weight'][0]  # [9408, 12, 4, 64]
             loss = criterion(output, target)
 
         acc1, acc5 = accuracy(output, target, topk=(1, 5))

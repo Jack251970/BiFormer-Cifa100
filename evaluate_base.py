@@ -14,6 +14,9 @@ email: ray.leizhu@outlook.com
 This source code is licensed under the license found in the
 LICENSE file in the root directory of this source tree.
 """
+from Visualizer.visualizer import get_local
+get_local.activate()
+
 import argparse
 import datetime
 import json
