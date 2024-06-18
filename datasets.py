@@ -58,21 +58,29 @@ def build_dataset(is_train, args):
 
     if args.data_set == 'CIFAR':
         dataset = datasets.CIFAR100(args.data_path, train=is_train, transform=transform, download=True)
+        ori_dataset = datasets.CIFAR100(args.data_path, train=is_train, transform=transforms.ToTensor(), download=True)
         nb_classes = 100
     elif args.data_set == 'IMNET':
         root = os.path.join(args.data_path, 'train' if is_train else 'val')
         dataset = datasets.ImageFolder(root, transform=transform)
+        ori_dataset = datasets.ImageFolder(root, transform=transforms.ToTensor())
         nb_classes = 1000
     elif args.data_set == 'INAT':
         dataset = INatDataset(args.data_path, train=is_train, year=2018,
                               category=args.inat_category, transform=transform)
+        ori_dataset = INatDataset(args.data_path, train=is_train, year=2018,
+                                    category=args.inat_category, transform=transforms.ToTensor())
         nb_classes = dataset.nb_classes
     elif args.data_set == 'INAT19':
         dataset = INatDataset(args.data_path, train=is_train, year=2019,
                               category=args.inat_category, transform=transform)
+        ori_dataset = INatDataset(args.data_path, train=is_train, year=2019,
+                                    category=args.inat_category, transform=transforms.ToTensor())
         nb_classes = dataset.nb_classes
+    else:
+        raise ValueError(f'dataset {args.data_set} not supported')
 
-    return dataset, nb_classes
+    return dataset, ori_dataset, nb_classes
 
 
 def build_transform(is_train, args):

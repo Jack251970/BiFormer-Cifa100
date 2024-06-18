@@ -218,8 +218,8 @@ def main(args):
 
     cudnn.benchmark = True
 
-    dataset_train, args.nb_classes = build_dataset(is_train=True, args=args)
-    dataset_val, _ = build_dataset(is_train=False, args=args)
+    dataset_train, _, args.nb_classes = build_dataset(is_train=True, args=args)
+    dataset_val, ori_dataset_val, _ = build_dataset(is_train=False, args=args)
 
     if True:  # args.distributed:
         num_tasks = utils.get_world_size()
@@ -421,7 +421,7 @@ def main(args):
             max_accuracy = checkpoint['max_accuracy']
 
     print(f"Start evaluation")
-    test_stats = evaluate(data_loader_val, model, device, output_images=True)
+    test_stats = evaluate(data_loader_val, model, device, ori_dataset_val)
     print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
 
     if args.eval:

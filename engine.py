@@ -8,6 +8,7 @@ import sys
 from typing import Iterable, Optional
 
 import torch
+import torchvision
 
 from timm.data import Mixup
 from timm.utils import accuracy, ModelEma
@@ -82,7 +83,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
 
 
 @torch.no_grad()
-def evaluate(data_loader, model, device, output_images=False):
+def evaluate(data_loader, model, device, ori_dataset=None):
     criterion = torch.nn.CrossEntropyLoss()
 
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -91,6 +92,7 @@ def evaluate(data_loader, model, device, output_images=False):
     # switch to evaluation mode
     model.eval()
 
+    batch_num = 0
     for images, target in metric_logger.log_every(data_loader, 10, header):  # [192, 3, 224, 224], [192]
         images = images.to(device, non_blocking=True)
         target = target.to(device, non_blocking=True)
@@ -99,13 +101,30 @@ def evaluate(data_loader, model, device, output_images=False):
         local_cache.clear()
         with torch.cuda.amp.autocast():
             output = model(images)
-            if output_images:
+            if ori_dataset is not None:
+                # get cache and phase the data
                 cache = local_cache.cache
-                x = cache['Block.local_images.images'][0]  # [192, 384, 14, 14]
-                r_weight = cache['Block.local_r_weight.r_weight'][0]  # [192, 49, 16],
-                r_idx = cache['Block.local_r_idx.r_idx'][0]  # [192, 49, 16]
-                attn_weight = cache['Block.local_attn_weight.attn_weight'][0]  # [192 * 49, 12, 4, 64]
-                a = 1
+                x = cache['Block.local_images.images'][0]  # ndarray: [192, 384, 14, 14]
+                r_weight = cache['Block.local_r_weight.r_weight'][0]  # ndarray: [192, 49, 16]
+                r_idx = cache['Block.local_r_idx.r_idx'][0]  # ndarray: [192, 49, 16]
+                attn_weight = cache['Block.local_attn_weight.attn_weight'][0]  # ndarray: [192 * 49, 12, 4, 64]
+
+                # get parameters
+                batch_size = x.shape[0]  # 192
+                n_heads = attn_weight.shape[2]  # 4
+
+                # reshape
+                attn_weight = attn_weight.reshape(batch_size, r_weight.shape[1] * n_heads, -1)  # [192, 49 * 4, 64]
+
+                # visualize images
+                for i in range(batch_size):
+                    # get original image
+                    image, label = ori_dataset[batch_size * batch_num + i]
+                    if label == target[i]:
+                        attn_weight_window = attn_weight[i].mean(axis=1)  # [49 * 4]
+                        image = torchvision.transforms.ToPILImage()(image)
+
+                batch_num = batch_num + 1
 
             loss = criterion(output, target)
 
