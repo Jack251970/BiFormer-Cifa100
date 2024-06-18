@@ -29,7 +29,7 @@ from ._common import Attention, AttentionLePE, DWConv
 
 # from positional_encodings import PositionalEncodingPermute2D, Summer
 # from siren_pytorch import SirenNet
-from Visualizer.visualizer import get_local
+from Visualizer.visualizer import local_cache
 
 
 
@@ -160,22 +160,22 @@ class Block(nn.Module):
         else:
             return x
 
-    @get_local('images')
+    @local_cache('images')
     def local_images(self, _images):
         images = _images
         return images
 
-    @get_local('r_weight')
+    @local_cache('r_weight')
     def local_r_weight(self, _r_weight):
         r_weight = _r_weight
         return r_weight
 
-    @get_local('r_idx')
+    @local_cache('r_idx')
     def local_r_idx(self, _r_idx):
         r_idx = _r_idx
         return r_idx
 
-    @get_local('attn_weight')
+    @local_cache('attn_weight')
     def local_attn_weight(self, _attn_weight):
         attn_weight = _attn_weight
         return attn_weight

@@ -1,1 +1,1 @@
-from .visualizer import get_local
+from .visualizer import local_cache

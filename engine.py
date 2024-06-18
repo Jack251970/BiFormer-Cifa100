@@ -16,7 +16,7 @@ from losses import DistillationLoss
 import utils
 from torch.utils.tensorboard import SummaryWriter
 
-from Visualizer.visualizer import get_local
+from Visualizer.visualizer import local_cache
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
@@ -96,15 +96,16 @@ def evaluate(data_loader, model, device, output_images=False):
         target = target.to(device, non_blocking=True)
 
         # compute output
-        get_local.clear()
+        local_cache.clear()
         with torch.cuda.amp.autocast():
             output = model(images)
             if output_images:
-                cache = get_local.cache
-                x = cache['Block.local_images'][0]  # [192, 384, 14, 14]
-                r_weight = cache['Block.local_r_weight'][0]  # [192, 49, 16],
-                r_idx = cache['Block.local_r_idx'][0]  # [192, 49, 16]
-                attn_weight = cache['Block.local_attn_weight'][0]  # [192 * 49, 12, 4, 64]
+                cache = local_cache.cache
+                x = cache['Block.local_images.images'][0]  # [192, 384, 14, 14]
+                r_weight = cache['Block.local_r_weight.r_weight'][0]  # [192, 49, 16],
+                r_idx = cache['Block.local_r_idx.r_idx'][0]  # [192, 49, 16]
+                attn_weight = cache['Block.local_attn_weight.attn_weight'][0]  # [192 * 49, 12, 4, 64]
+                a = 1
 
             loss = criterion(output, target)
 
