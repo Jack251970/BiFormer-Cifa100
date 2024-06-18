@@ -421,7 +421,7 @@ def main(args):
             max_accuracy = checkpoint['max_accuracy']
 
     print(f"Start evaluation")
-    test_stats = evaluate(data_loader_val, model, device)
+    test_stats = evaluate(data_loader_val, model, device, output_images=True)
     print(f"Accuracy of the network on the {len(dataset_val)} test images: {test_stats['acc1']:.1f}%")
 
     if args.eval:

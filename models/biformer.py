@@ -152,12 +152,18 @@ class Block(nn.Module):
         # permute back
         x = x.permute(0, 3, 1, 2)  # (N, H, W, C) -> (N, C, H, W)
         if self.out_attn:  # [192, 384, 14, 14], [192, 49, 16], [192, 49, 16], [9408, 12, 4, 64]
+            self.local_images(x)
             self.local_r_weight(r_weight)
             self.local_r_idx(r_idx)
             self.local_attn_weight(attn_weight)
             return x
         else:
             return x
+
+    @get_local('images')
+    def local_images(self, _images):
+        images = _images
+        return images
 
     @get_local('r_weight')
     def local_r_weight(self, _r_weight):
