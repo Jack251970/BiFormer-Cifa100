@@ -12,7 +12,7 @@ class local_cache(object):
         if not type(self).is_activate:
             return func
 
-        type(self).cache[self._get_cache_key(func)] = []
+        type(self).cache[self._get_cache_key(func, self.varname)] = []
         c = Bytecode.from_code(func.__code__)
         extra_code = [
             Instr('STORE_FAST', '_res'),
@@ -29,13 +29,14 @@ class local_cache(object):
 
         def wrapper(*args, **kwargs):
             res, values = func(*args, **kwargs)
-            type(self).cache[self._get_cache_key(func)].append(self._get_values_cache(values))
+            type(self).cache[self._get_cache_key(func, self.varname)].append(self._get_values_cache(values))
             return res
 
         return wrapper
 
-    def _get_cache_key(self, func):
-        return func.__qualname__ + '.' + self.varname
+    @staticmethod
+    def _get_cache_key(func, varname):
+        return func.__qualname__ + '.' + varname
 
     @staticmethod
     def _get_values_cache(values):
