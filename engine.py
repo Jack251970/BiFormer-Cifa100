@@ -123,33 +123,34 @@ def evaluate(data_loader, model, device, ori_dataset=None):
                     attn_weight = attn_weight.mean(axis=2)  # [192, 49 * 4]
 
                     # visualize images
-                    plt.clf()
-                    fig, axes = plt.subplots(nrows=10, ncols=10, figsize=(32, 32))
-                    for i in range(100):
-                        # get original image
-                        image, label = ori_dataset[batch_size * batch_num + i]
+                    for alpha in [0.1, 0.2, 0.3, 0.4, 0.5]:
+                        plt.clf()
+                        fig, axes = plt.subplots(nrows=10, ncols=10, figsize=(32, 32))
+                        for i in range(100):
+                            # get original image
+                            image, label = ori_dataset[batch_size * batch_num + i]
 
-                        # check label
-                        if label == target[i]:
-                            attention_map = attn_weight[i]  # attn size need less than figure size
-                            length = int(math.sqrt(attention_map.shape[0]))
-                            attention_map = attention_map.reshape(length, length)
-                            attention_map = np.repeat(attention_map, 2, axis=0)
-                            attention_map = np.repeat(attention_map, 2, axis=1)
-                            image = torchvision.transforms.ToPILImage()(image)
+                            # check label
+                            if label == target[i]:
+                                attention_map = attn_weight[i]  # attn size need less than figure size
+                                length = int(math.sqrt(attention_map.shape[0]))
+                                attention_map = attention_map.reshape(length, length)
+                                attention_map = np.repeat(attention_map, 2, axis=0)
+                                attention_map = np.repeat(attention_map, 2, axis=1)
+                                image = torchvision.transforms.ToPILImage()(image)
 
-                            ax = axes[i // 10, i % 10]
-                            ax.imshow(image)
-                            ax.imshow(attention_map, alpha=0.1, cmap='rainbow')
-                            ax.axis('off')
+                                ax = axes[i // 10, i % 10]
+                                ax.imshow(image)
+                                ax.imshow(attention_map, alpha=alpha, cmap='rainbow')
+                                ax.axis('off')
 
-                    plt.tight_layout()
-                    # plt.show()
-                    path = 'out/visual'
-                    if not os.path.exists(path):
-                        os.makedirs(path)
-                    plt.savefig(f'out/visual/figure and attn {batch_num}.png')
-                    print(f'out/visual/figure and attn {batch_num}.png saved')
+                        plt.tight_layout()
+                        # plt.show()
+                        path = 'out/visual'
+                        if not os.path.exists(path):
+                            os.makedirs(path)
+                        plt.savefig(f'out/visual/figure and attn {batch_num} alpha {alpha}.png')
+                        print(f'out/visual/figure and attn {batch_num} alpha {alpha}.png saved')
 
                     batch_num = batch_num + 1
 
