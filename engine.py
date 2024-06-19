@@ -4,11 +4,14 @@
 Train and eval functions used in main.py
 """
 import math
+import os.path
 import sys
 from typing import Iterable, Optional
 
+import numpy as np
 import torch
 import torchvision
+from matplotlib import pyplot as plt
 
 from timm.data import Mixup
 from timm.utils import accuracy, ModelEma
@@ -102,29 +105,53 @@ def evaluate(data_loader, model, device, ori_dataset=None):
         with torch.cuda.amp.autocast():
             output = model(images)
             if ori_dataset is not None:
-                # get cache and phase the data
-                cache = local_cache.cache
-                x = cache['Block.local_images.images'][0]  # ndarray: [192, 384, 14, 14]
-                r_weight = cache['Block.local_r_weight.r_weight'][0]  # ndarray: [192, 49, 16]
-                r_idx = cache['Block.local_r_idx.r_idx'][0]  # ndarray: [192, 49, 16]
-                attn_weight = cache['Block.local_attn_weight.attn_weight'][0]  # ndarray: [192 * 49, 12, 4, 64]
+                if len(target) >= 100:
+                    # get cache and phase the data
+                    cache = local_cache.cache
+                    x = cache['Block.local_images.images'][0]  # ndarray: [192, 384, 14, 14]
+                    r_weight = cache['Block.local_r_weight.r_weight'][0]  # ndarray: [192, 49, 16]
+                    r_idx = cache['Block.local_r_idx.r_idx'][0]  # ndarray: [192, 49, 16]
+                    attn_weight = cache['Block.local_attn_weight.attn_weight'][0]  # ndarray: [192 * 49, 12, 4, 64]
 
-                # get parameters
-                batch_size = x.shape[0]  # 192
-                n_heads = attn_weight.shape[2]  # 4
+                    # get parameters
+                    batch_size = x.shape[0]  # 192
+                    win_size = attn_weight.shape[2]  # 4
 
-                # reshape
-                attn_weight = attn_weight.reshape(batch_size, r_weight.shape[1] * n_heads, -1)  # [192, 49 * 4, 64]
+                    # mean & reshape
+                    attn_weight = attn_weight.mean(axis=1)  # [192 * 49, 4, 64]
+                    attn_weight = attn_weight.reshape(batch_size, r_weight.shape[1] * win_size, -1)  # [192, 49 * 4, 64]
+                    attn_weight = attn_weight.mean(axis=2)  # [192, 49 * 4]
 
-                # visualize images
-                for i in range(batch_size):
-                    # get original image
-                    image, label = ori_dataset[batch_size * batch_num + i]
-                    if label == target[i]:
-                        attn_weight_window = attn_weight[i].mean(axis=1)  # [49 * 4]
-                        image = torchvision.transforms.ToPILImage()(image)
+                    # visualize images
+                    plt.clf()
+                    fig, axes = plt.subplots(nrows=10, ncols=10, figsize=(32, 32))
+                    for i in range(100):
+                        # get original image
+                        image, label = ori_dataset[batch_size * batch_num + i]
 
-                batch_num = batch_num + 1
+                        # check label
+                        if label == target[i]:
+                            attention_map = attn_weight[i]  # attn size need less than figure size
+                            length = int(math.sqrt(attention_map.shape[0]))
+                            attention_map = attention_map.reshape(length, length)
+                            attention_map = np.repeat(attention_map, 2, axis=0)
+                            attention_map = np.repeat(attention_map, 2, axis=1)
+                            image = torchvision.transforms.ToPILImage()(image)
+
+                            ax = axes[i // 10, i % 10]
+                            ax.imshow(image)
+                            ax.imshow(attention_map, alpha=0.1, cmap='rainbow')
+                            ax.axis('off')
+
+                    plt.tight_layout()
+                    # plt.show()
+                    path = 'out/visual'
+                    if not os.path.exists(path):
+                        os.makedirs(path)
+                    plt.savefig(f'out/visual/figure and attn {batch_num}.png')
+                    print(f'out/visual/figure and attn {batch_num}.png saved')
+
+                    batch_num = batch_num + 1
 
             loss = criterion(output, target)
 
