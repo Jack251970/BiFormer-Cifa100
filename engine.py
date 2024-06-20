@@ -87,6 +87,35 @@ def train_one_epoch(model: torch.nn.Module, criterion: DistillationLoss,
 
 @torch.no_grad()
 def evaluate(data_loader, model, device, ori_dataset=None):
+    def set_times_new_roman_font():
+        from matplotlib import rcParams
+
+        config = {
+            "font.family": 'serif',
+            "font.size": 12,
+            "font.serif": ['Times New Roman'],
+            # "mathtext.fontset": 'stix',
+            # 'axes.unicode_minus': False
+        }
+        rcParams.update(config)
+    set_times_new_roman_font()
+
+    # visualize the cnn layer in downsample
+    if ori_dataset is not None:
+        for name, param in model.named_parameters():
+            if 'downsample_layers.0.0.weight' == name:
+                in_channels = param.size()[1]  # 输入通道
+                out_channels = param.size()[0]  # 输出通道
+                k_w, k_h = param.size()[3], param.size()[2]  # 卷积核的尺寸
+                kernel_all = param.view(-1, 1, k_w, k_h)  # 每个通道的卷积核
+                kernel_grid = torchvision.utils.make_grid(kernel_all, normalize=True, scale_each=True, nrow=in_channels)
+                plt.figure(figsize=(10, 10))
+                plt.imshow(kernel_grid.permute(1, 2, 0).cpu().numpy(), cmap='viridis')
+                plt.title("Convolutional Kernels")
+                plt.axis('off')
+                # plt.show()
+                plt.savefig('out/visual/convolutional kernels in downsample 0.png')
+
     criterion = torch.nn.CrossEntropyLoss()
 
     metric_logger = utils.MetricLogger(delimiter="  ")
@@ -123,7 +152,7 @@ def evaluate(data_loader, model, device, ori_dataset=None):
                     attn_weight = attn_weight.mean(axis=2)  # [192, 49 * 4]
 
                     # visualize images
-                    for alpha in [0.1, 0.2, 0.3, 0.4, 0.5]:
+                    for alpha in [0.2]:
                         plt.clf()
                         fig, axes = plt.subplots(nrows=10, ncols=10, figsize=(42, 42))
                         for i in range(100):
